@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 
 
-/// @title StableCoin: An ERC20 token with staking and burning capabilities
 contract StableCoinUAUSD is ERC20, Ownable {
     bool public paused = false;
 
