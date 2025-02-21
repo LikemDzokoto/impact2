@@ -1,54 +1,85 @@
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { ImpactoMoney, StableCoinPaypalUSDT, StableCoinUAUSD, StableCoinUSDC, StableCoinUSDT } from "../../typechain-types";
+import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 
-// import { expect } from "chai";
-// import { ethers } from "hardhat";
-// import { ImpactoMoney, StableCoinUSDT } from "../../typechain-types";
+describe("ImpactoMoney Donation Flow Integration Test", function () {
+    async function deployImpactToMoneyFixture() {
+        const [owner, beneficiary] = await ethers.getSigners();
 
-// describe("Donation Flow Integration Test", function () {
-//   let impacto: ImpactoMoney;
-//   let stableCoin: StableCoinUSDT;
-//   let owner: any, admin: any, beneficiary: any;
-//   const voucherPrice = ethers.parseUnits("10", 18);
+        // Deploy stablecoin contracts (assuming they follow the StableCoinUSDC pattern)
+        const StableCoinUSDT = await ethers.getContractFactory("StableCoinUSDT");
+        const stableCoinUSDT = await StableCoinUSDT.deploy(owner.address);
 
-//   beforeEach(async function () {
-//     [owner, admin, beneficiary] = await ethers.getSigners();
+        const StableCoinUAUSD = await ethers.getContractFactory("StableCoinUAUSD");
+        const stableCoinUAUSD = await StableCoinUAUSD.deploy(owner.address);
 
-//     // Deploy StableCoinUSDT (acting as a stablecoin for testing)
-//     const StableCoinFactory = await ethers.getContractFactory("StableCoinUSDT");
-//     stableCoin = (await StableCoinFactory.deploy(owner.address)) as StableCoinUSDT;
-//     await stableCoin.deployed();
+        const StableCoinUSDC = await ethers.getContractFactory("StableCoinUSDC");
+        const stableCoinUSDC = await StableCoinUSDC.deploy(owner.address);
 
-//     // Deploy ImpactoMoney with the stablecoin addresses (using the same for all currency choices for testing)
-//     const ImpactoMoneyFactory = await ethers.getContractFactory("ImpactoMoney");
-//     impacto = (await ImpactoMoneyFactory.deploy(
-//       stableCoin.address,
-//       stableCoin.address,
-//       stableCoin.address,
-//       stableCoin.address,
-//       "ipfs://initialMetadata",
-//       owner.address
-//     )) as ImpactoMoney;
-//     await impacto.deployed();
+        const StableCoinPaypalUSDT = await ethers.getContractFactory("StableCoinPaypalUSDT");
+        const stableCoinPaypalUSDT = await StableCoinPaypalUSDT.deploy(owner.address);
 
-//     // Whitelist the beneficiary for donation eligibility
-//     await impacto.whitelistBeneficiaries([beneficiary.address]);
+        // Deploy ImpactoMoney contract
+        const ImpactoMoney = await ethers.getContractFactory("ImpactoMoney");
+        const impactoMoney = await ImpactoMoney.deploy(
+            await stableCoinUAUSD.getAddress(),
+            await stableCoinPaypalUSDT.getAddress(),
+            await stableCoinUSDT.getAddress(),
+            await stableCoinUSDC.getAddress(),
+            "ipfs://",
+            owner.address
+        );
 
-//     // Simulate funding for donation: transfer tokens to admin and approve the ImpactoMoney contract
-//     await stableCoin.transfer(admin.address, voucherPrice.mul(2));
-//     await stableCoin.connect(admin).approve(impacto.address, voucherPrice.mul(2));
-//   });
+        return {
+            impactoMoney,
+            owner,
+            beneficiary,
+            stableCoinPaypalUSDT,
+            stableCoinUAUSD,
+            stableCoinUSDC,
+            stableCoinUSDT,
+        };
+    }
 
-//   it("should process donation and mint an NFT voucher", async function () {
-//     // Call donateAndMint from admin (or owner if that's the admin in your system)
-//     await expect(
-//       impacto.connect(owner).donateAndMint([beneficiary.address], voucherPrice, 0)
-//     ).to.emit(impacto, "NFTMinted");
+    it("should successfully complete the donation flow", async function () {
+        const { impactoMoney, owner, beneficiary, stableCoinUSDT } = await loadFixture(deployImpactToMoneyFixture);
 
-//     // Verify that the beneficiary's locked funds are set correctly
-//     const locked = await impacto.lockedAmount(beneficiary.address);
-//     expect(locked).to.equal(voucherPrice);
+        // Step 1: Whitelist the beneficiary
+        await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address]);
+        expect(await impactoMoney.whitelistedBeneficiaries(beneficiary.address)).to.be.true;
 
-//     // Verify that the beneficiary received the NFT voucher (tokenId starts at 1)
-//     const nftBalance = await impacto.balanceOf(beneficiary.address, 1);
-//     expect(nftBalance).to.equal(1);
-//   });
-// });
+        // Step 2: Approve the ImpactoMoney contract to spend USDT
+        const donationAmount = ethers.parseUnits("100", 18); // 100 USDT
+        await stableCoinUSDT.connect(owner).approve(impactoMoney.getAddress(), donationAmount);
+        expect(await stableCoinUSDT.allowance(owner.address, impactoMoney.getAddress())).to.equal(donationAmount);
+
+        // Step 3: Record initial balances
+        const initialOwnerBalance = await stableCoinUSDT.balanceOf(owner.address);
+        const initialBeneficiaryBalance = await stableCoinUSDT.balanceOf(beneficiary.address);
+
+        // Step 4: Call donateAndMint
+        const beneficiaries = [beneficiary.address];
+        const currencyChoice = 2; // USDT
+        const tx = await impactoMoney.connect(owner).donateAndMint(beneficiaries, donationAmount, currencyChoice);
+        await tx.wait();
+
+        // Step 5: Verify outcomes
+        // NFT minted to beneficiary
+        expect(await impactoMoney.balanceOf(beneficiary.address, 1)).to.equal(1);
+        expect(await impactoMoney.beneficiaryTokenId(beneficiary.address)).to.equal(1);
+
+        // USDT transferred from owner to beneficiary
+        expect(await stableCoinUSDT.balanceOf(owner.address)).to.equal(initialOwnerBalance - donationAmount);
+        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance + donationAmount);
+
+        // Locked amount set
+        expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(donationAmount);
+
+        // Token ID incremented
+        expect(await impactoMoney.tokenId()).to.equal(2);
+
+        // Event emitted
+        await expect(tx).to.emit(impactoMoney, "NFTMinted").withArgs(beneficiary.address, 1);
+    });
+});

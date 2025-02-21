@@ -1,57 +1,93 @@
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { ImpactoMoney, StableCoinPaypalUSDT, StableCoinUAUSD, StableCoinUSDC, StableCoinUSDT } from "../../typechain-types";
+import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 
-// import { expect } from "chai";
-// import { ethers } from "hardhat";
-// import { ImpactoMoney, StableCoinUSDT } from "../../typechain-types";
+describe("ImpactoMoney Redeem Flow Integration Test", function () {
+    async function deployImpactToMoneyFixture() {
+        const [owner, beneficiary, serviceProvider] = await ethers.getSigners();
 
-// describe("Redemption Flow Integration Test", function () {
-//   let impacto: ImpactoMoney;
-//   let stableCoin: StableCoinUSDT;
-//   let owner: any, admin: any, beneficiary: any, serviceProvider: any;
-//   const voucherPrice = ethers.parseUnits("10", 18);
+        // Deploy stablecoin contracts
+        const StableCoinUSDT = await ethers.getContractFactory("StableCoinUSDT");
+        const stableCoinUSDT = await StableCoinUSDT.deploy(owner.address);
 
-//   beforeEach(async function () {
-//     [owner, admin, beneficiary, serviceProvider] = await ethers.getSigners();
+        const StableCoinUAUSD = await ethers.getContractFactory("StableCoinUAUSD");
+        const stableCoinUAUSD = await StableCoinUAUSD.deploy(owner.address);
 
-//     // Deploy the stablecoin
-//     const StableCoinFactory = await ethers.getContractFactory("StableCoinUSDT");
-//     stableCoin = (await StableCoinFactory.deploy(owner.address)) as StableCoinUSDT;
-//     await stableCoin.deployed();
+        const StableCoinUSDC = await ethers.getContractFactory("StableCoinUSDC");
+        const stableCoinUSDC = await StableCoinUSDC.deploy(owner.address);
 
-//     // Deploy ImpactoMoney
-//     const ImpactoMoneyFactory = await ethers.getContractFactory("ImpactoMoney");
-//     impacto = (await ImpactoMoneyFactory.deploy(
-//       stableCoin.address,
-//       stableCoin.address,
-//       stableCoin.address,
-//       stableCoin.address,
-//       "ipfs://initialMetadata",
-//       owner.address
-//     )) as ImpactoMoney;
-//     await impacto.deployed();
+        const StableCoinPaypalUSDT = await ethers.getContractFactory("StableCoinPaypalUSDT");
+        const stableCoinPaypalUSDT = await StableCoinPaypalUSDT.deploy(owner.address);
 
-//     // Whitelist beneficiary
-//     await impacto.whitelistBeneficiaries([beneficiary.address]);
+        // Deploy ImpactoMoney contract
+        const ImpactoMoney = await ethers.getContractFactory("ImpactoMoney");
+        const impactoMoney = await ImpactoMoney.deploy(
+            await stableCoinUAUSD.getAddress(),
+            await stableCoinPaypalUSDT.getAddress(),
+            await stableCoinUSDT.getAddress(),
+            await stableCoinUSDC.getAddress(),
+            "ipfs://",
+            owner.address
+        );
 
-//     // Fund admin and approve ImpactoMoney for donation
-//     await stableCoin.transfer(admin.address, voucherPrice.mul(2));
-//     await stableCoin.connect(admin).approve(impacto.address, voucherPrice.mul(2));
+        return {
+            impactoMoney,
+            owner,
+            beneficiary,
+            serviceProvider,
+            stableCoinPaypalUSDT,
+            stableCoinUAUSD,
+            stableCoinUSDC,
+            stableCoinUSDT,
+        };
+    }
 
-//     // Simulate a donation to mint the voucher
-//     await impacto.connect(owner).donateAndMint([beneficiary.address], voucherPrice, 0);
-//   });
+    it("should successfully complete the redeem flow", async function () {
+        const { impactoMoney, owner, beneficiary, serviceProvider, stableCoinUSDT } = await loadFixture(deployImpactToMoneyFixture);
 
-//   it("should allow voucher redemption and transfer funds to service provider", async function () {
-//     // Beneficiary redeems their voucher; assuming voucherId is 1
-//     await expect(
-//       impacto.connect(beneficiary).redeem(beneficiary.address, serviceProvider.address, 0, 1)
-//     ).to.emit(impacto, "Redeemed");
+        // Step 1: Set up donation flow (prerequisite for redeem)
+        const donationAmount = ethers.parseUnits("100", 18); // 100 USDT
+        await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address]);
+        await stableCoinUSDT.connect(owner).approve(impactoMoney.getAddress(), donationAmount);
+        await impactoMoney.connect(owner).donateAndMint([beneficiary.address], donationAmount, 2); // USDT = 2
 
-//     // Verify that the beneficiary's locked funds are reset
-//     const lockedAfter = await impacto.lockedAmount(beneficiary.address);
-//     expect(lockedAfter).to.equal(0);
+        // Verify setup
+        expect(await impactoMoney.balanceOf(beneficiary.address, 1)).to.equal(1);
+        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(donationAmount);
+        expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(donationAmount);
 
-//     // Verify that the service provider received the funds (voucherPrice amount)
-//     const serviceBalance = await stableCoin.balanceOf(serviceProvider.address);
-//     expect(serviceBalance).to.equal(voucherPrice);
-//   });
-// });
+        // Step 2: Beneficiary approves ImpactoMoney to spend USDT
+        await stableCoinUSDT.connect(beneficiary).approve(impactoMoney.getAddress(), donationAmount);
+        expect(await stableCoinUSDT.allowance(beneficiary.address, impactoMoney.getAddress())).to.equal(donationAmount);
+
+        // Step 3: Record initial balances
+        const initialBeneficiaryBalance = await stableCoinUSDT.balanceOf(beneficiary.address);
+        const initialServiceProviderBalance = await stableCoinUSDT.balanceOf(serviceProvider.address);
+
+        // Step 4: Call redeem
+        const tx = await impactoMoney.connect(beneficiary).redeem(
+            beneficiary.address,
+            serviceProvider.address,
+            2, // USDT
+            1  // tokenId
+        );
+        await tx.wait();
+
+        // Step 5: Verify outcomes
+        // NFT is burned
+        expect(await impactoMoney.balanceOf(beneficiary.address, 1)).to.equal(0);
+
+        // USDT transferred from beneficiary to service provider
+        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance - donationAmount);
+        expect(await stableCoinUSDT.balanceOf(serviceProvider.address)).to.equal(initialServiceProviderBalance + donationAmount);
+
+        // Locked amount reset
+        expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(0);
+
+        // Event emitted
+        await expect(tx)
+            .to.emit(impactoMoney, "Redeemed")
+            .withArgs(beneficiary.address, serviceProvider.address, donationAmount);
+    });
+});
