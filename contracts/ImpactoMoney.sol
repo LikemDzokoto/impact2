@@ -78,59 +78,59 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         return tokenURIs[_id]; // Retrieve the specific URI for each tokenId
     }
 
-    function donateAndMint(
-        address[] memory beneficiaries,
-        uint256 voucherPrice,
-        uint256 currencyChoice
-    ) external onlyAdmin whenNotPaused nonReentrant {
-        uint256 count = beneficiaries.length;
-        require(count > 0, "Beneficiaries list is empty");
-        require(voucherPrice > 0, "Donation amount must be greater than zero");
+        function donateAndMint (
+            address[] memory beneficiaries,
+            uint256 voucherPrice,
+            uint256 currencyChoice
+        ) external onlyAdmin whenNotPaused nonReentrant {
+            uint256 count = beneficiaries.length;
+            require(count > 0, "Beneficiaries list is empty");
+            require(voucherPrice > 0, "Donation amount must be greater than zero");
 
-        IERC20 selectedCurrency;
-         if (currencyChoice == 0) {
-         selectedCurrency = UAUSD;
-        } else if (currencyChoice == 1) {
-        selectedCurrency = PayPalUSD;
-        } else if (currencyChoice == 2) {
-        selectedCurrency = USDT;  // Fix here
-        } else if (currencyChoice == 3) {
-        selectedCurrency = USDC;  // Fix here
-        } else {
-            revert("Invalid currency choice");
-        }
+            IERC20 selectedCurrency;
+            if (currencyChoice == 0) {
+            selectedCurrency = UAUSD;
+            } else if (currencyChoice == 1) {
+            selectedCurrency = PayPalUSD;
+            } else if (currencyChoice == 2) {
+            selectedCurrency = USDT;  // Fix here
+            } else if (currencyChoice == 3) {
+            selectedCurrency = USDC;  // Fix here
+            } else {
+                revert("Invalid currency choice");
+            }
 
 
-        require(
-            selectedCurrency.balanceOf(msg.sender) >= voucherPrice * count,
-            "Insufficient currency balance"
-        );
-        require(
-            selectedCurrency.allowance(msg.sender, address(this)) >=
-                voucherPrice * count,
-            "Insufficient allowance"
-        );
-
-        for (uint256 i = 0; i < count; i++) {
-            address beneficiary = beneficiaries[i];
             require(
-                whitelistedBeneficiaries[beneficiary],
-                "Beneficiary not whitelisted"
+                selectedCurrency.balanceOf(msg.sender) >= voucherPrice * count,
+                "Insufficient currency balance"
+            );
+            require(
+                selectedCurrency.allowance(msg.sender, address(this)) >=
+                    voucherPrice * count,
+                "Insufficient allowance"
             );
 
-            beneficiaryTokenId[beneficiary] = tokenId;
-            _mint(beneficiary, tokenId, 1, "");
-            emit NFTMinted(beneficiary, tokenId);
-            tokenId++;
+            for (uint256 i = 0; i < count; i++) {
+                address beneficiary = beneficiaries[i];
+                require(
+                    whitelistedBeneficiaries[beneficiary],
+                    "Beneficiary not whitelisted"
+                );
 
-            selectedCurrency.safeTransferFrom(
-                msg.sender,
-                beneficiary,
-                voucherPrice
-            );
-            lockedAmount[beneficiary] = voucherPrice;
+                beneficiaryTokenId[beneficiary] = tokenId;
+                _mint(beneficiary, tokenId, 1, "");
+                emit NFTMinted(beneficiary, tokenId);
+                tokenId++;
+
+                selectedCurrency.safeTransferFrom(
+                    msg.sender,
+                    beneficiary,
+                    voucherPrice
+                );
+                lockedAmount[beneficiary] = voucherPrice;
+            }
         }
-    }
 
     function redeem(
         address beneficiary,

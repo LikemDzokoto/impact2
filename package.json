@@ -1,13 +1,11 @@
 {
-
-  {
-    "scripts": {
-      "test:unit": "hardhat test ./test/unit/**/*.ts",
-      "test:integration": "hardhat test ./test/integration/**/*.ts",
-      "test:all": "hardhat test"
-    }
-  }
+  "scripts": {
+    "test:unit": "hardhat test ./test/unit/**/*.ts",
+    "test:integration": "hardhat test ./test/integration/**/*.ts",
+    "test:all": "hardhat test"
+  },
   "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.22.18"
   },
