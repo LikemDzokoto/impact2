@@ -1,1 +1,1 @@
-# Impact2Money v1.0
+# Impact2Money
