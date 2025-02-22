@@ -195,7 +195,7 @@ describe("ImpactToMoney Contract", function () {
             await impactoMoney.connect(beneficiary).redeem(1);
 
             // Check NFT is burned
-            await expect(impactoMoney.ownerOf(1)).to.be.reverted;
+            await expect(impactoMoney.owner(1)).to.be.reverted;
 
             // Check stablecoin transfer (assuming it goes to serviceProvider)
             expect(await stableCoinUSDT.balanceOf(serviceProvider.address)).to.equal(voucherPrice);
@@ -213,7 +213,7 @@ describe("ImpactToMoney Contract", function () {
                 impactoMoney.connect(nonOwner).whitelistBeneficiaries([beneficiary.address])).to.be.revertedWith("Ownable: caller is not the owner");
 
             await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address])
-            expect(await impactoMoney.isWhitelisted(beneficiary.address)).to.be.true;
+            expect(await impactoMoney.whitelistBeneficiaries([beneficiary.address])).to.be.true;
         });
 
         it("should allow only owner to remove from whitelist", async function () {
@@ -225,7 +225,7 @@ describe("ImpactToMoney Contract", function () {
             ).to.be.revertedWith("Ownable: caller is not the owner");
 
             await impactoMoney.connect(owner).removeWhitelistedBeneficiaries([beneficiary.address]);
-            expect(await impactoMoney.isWhitelisted(beneficiary.address)).to.be.false;
+            expect(await impactoMoney.whitelistBeneficiaries([beneficiary.address])).to.be.false;
         });
     });
 
@@ -238,8 +238,8 @@ describe("ImpactToMoney Contract", function () {
             await impactoMoney.connect(owner).pauseContract();
             expect(await impactoMoney.paused()).to.be.true;
 
-            await expect(impactoMoney.connect(nonOwner).unpause()).to.be.revertedWith("Ownable: caller is not the owner");
-            await impactoMoney.connect(owner).unpause();
+            await expect(impactoMoney.connect(nonOwner).unpauseContract()).to.be.revertedWith("Ownable: caller is not the owner");
+            await impactoMoney.connect(owner).unpauseContract();
             expect(await impactoMoney.paused()).to.be.false;
         });
 

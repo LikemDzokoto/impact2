@@ -7,7 +7,7 @@ describe("ImpactoMoney Redeem Flow Integration Test", function () {
     async function deployImpactToMoneyFixture() {
         const [owner, beneficiary, serviceProvider] = await ethers.getSigners();
 
-        // Deploy stablecoin contracts
+
         const StableCoinUSDT = await ethers.getContractFactory("StableCoinUSDT");
         const stableCoinUSDT = await StableCoinUSDT.deploy(owner.address);
 
@@ -20,7 +20,7 @@ describe("ImpactoMoney Redeem Flow Integration Test", function () {
         const StableCoinPaypalUSDT = await ethers.getContractFactory("StableCoinPaypalUSDT");
         const stableCoinPaypalUSDT = await StableCoinPaypalUSDT.deploy(owner.address);
 
-        // Deploy ImpactoMoney contract
+
         const ImpactoMoney = await ethers.getContractFactory("ImpactoMoney");
         const impactoMoney = await ImpactoMoney.deploy(
             await stableCoinUAUSD.getAddress(),
@@ -46,7 +46,21 @@ describe("ImpactoMoney Redeem Flow Integration Test", function () {
     it("should successfully complete the redeem flow", async function () {
         const { impactoMoney, owner, beneficiary, serviceProvider, stableCoinUSDT } = await loadFixture(deployImpactToMoneyFixture);
 
-        // Step 1: Set up donation flow (prerequisite for redeem)
+        console.log("Owner initial USDT:", ethers.formatUnits(await stableCoinUSDT.balanceOf(owner.address), 18));
+        console.log("Beneficiary initial USDT:", ethers.formatUnits(await stableCoinUSDT.balanceOf(beneficiary.address), 18));
+        console.log("Beneficiary initial ETH:", ethers.formatEther(await ethers.provider.getBalance(beneficiary.address)));
+        console.log("Deployed StableCoinUSDT address:", await stableCoinUSDT.getAddress());
+        console.log("ImpactoMoney USDT address:", await impactoMoney.USDT());
+
+
+
+        //console log out all addresses 
+        console.log("owner address", owner.address);
+        console.log("Beneficiary address:", beneficiary.address);
+        console.log("ServiceProvider address:", serviceProvider.address);
+
+
+        // Set up donation flow (prerequisite for redeem)
         const donationAmount = ethers.parseUnits("100", 18); // 100 USDT
         await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address]);
         await stableCoinUSDT.connect(owner).approve(impactoMoney.getAddress(), donationAmount);
@@ -57,37 +71,59 @@ describe("ImpactoMoney Redeem Flow Integration Test", function () {
         expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(donationAmount);
         expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(donationAmount);
 
-        // Step 2: Beneficiary approves ImpactoMoney to spend USDT
+        // Beneficiary approves ImpactoMoney to spend USDT
         await stableCoinUSDT.connect(beneficiary).approve(impactoMoney.getAddress(), donationAmount);
+        console.log("Beneficiary allowance to contract:", ethers.formatUnits(await stableCoinUSDT.allowance(beneficiary.address, impactoMoney.getAddress()), 18));
         expect(await stableCoinUSDT.allowance(beneficiary.address, impactoMoney.getAddress())).to.equal(donationAmount);
 
-        // Step 3: Record initial balances
+
+
+        // Before redeem balances
         const initialBeneficiaryBalance = await stableCoinUSDT.balanceOf(beneficiary.address);
         const initialServiceProviderBalance = await stableCoinUSDT.balanceOf(serviceProvider.address);
+        console.log("Before redeem - Beneficiary USDT:", ethers.formatUnits(initialBeneficiaryBalance, 18));
+        console.log("Before redeem - Service Provider USDT:", ethers.formatUnits(initialServiceProviderBalance, 18));
+        console.log("Caller address for redeem:", beneficiary.address); // Confirm signer
 
-        // Step 4: Call redeem
+
+
         const tx = await impactoMoney.connect(beneficiary).redeem(
             beneficiary.address,
             serviceProvider.address,
-            2, // USDT
-            1  // tokenId
+            2,
+            1
         );
         await tx.wait();
+        
+        try {
+            console.log("After redeem - Beneficiary USDT:", ethers.formatUnits(await stableCoinUSDT.balanceOf(beneficiary.address), 18));
+            console.log("After redeem - Service Provider USDT:", ethers.formatUnits(await stableCoinUSDT.balanceOf(serviceProvider.address), 18));
+            console.log("Last caller in contract:", await impactoMoney.lastCaller());
+        } catch (error: unknown) {
+            if (error instanceof Error) {
+                console.log("Redeem failed with error:", error.message);
+                console.log("Last caller in contract (after fail):", await impactoMoney.lastCaller());
+                throw error; // Re-throw to fail the test
+            }
+        }
+        
 
-        // Step 5: Verify outcomes
-        // NFT is burned
-        expect(await impactoMoney.balanceOf(beneficiary.address, 1)).to.equal(0);
 
-        // USDT transferred from beneficiary to service provider
-        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance - donationAmount);
-        expect(await stableCoinUSDT.balanceOf(serviceProvider.address)).to.equal(initialServiceProviderBalance + donationAmount);
+    // NFT is burned
+    expect(await impactoMoney.balanceOf(beneficiary.address, 1)).to.equal(0);
 
-        // Locked amount reset
-        expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(0);
+    // USDT transferred from beneficiary to service provider
+    expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance - donationAmount);
+    expect(await stableCoinUSDT.balanceOf(serviceProvider.address)).to.equal(initialServiceProviderBalance + donationAmount);
 
-        // Event emitted
-        await expect(tx)
-            .to.emit(impactoMoney, "Redeemed")
-            .withArgs(beneficiary.address, serviceProvider.address, donationAmount);
-    });
+    console.log("Amount redeemed by Service Provider:", await stableCoinUSDT.balanceOf(serviceProvider.address));
+
+
+    expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(0);
+
+    ``
+    await expect(tx)
+        .to.emit(impactoMoney, "Redeemed")
+        .withArgs(beneficiary.address, serviceProvider.address, donationAmount);
+});
 });

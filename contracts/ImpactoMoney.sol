@@ -23,6 +23,8 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
     IERC20 public USDT;
     IERC20 public USDC;
 
+    //temp address to debug
+    address public lastCaller;
 
     uint256 public tokenId = 1;
     mapping(uint256 => string) private tokenURIs; // New mapping for token-specific URIs
@@ -93,9 +95,9 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
             } else if (currencyChoice == 1) {
             selectedCurrency = PayPalUSD;
             } else if (currencyChoice == 2) {
-            selectedCurrency = USDT;  // Fix here
+            selectedCurrency = USDT; 
             } else if (currencyChoice == 3) {
-            selectedCurrency = USDC;  // Fix here
+            selectedCurrency = USDC;  
             } else {
                 revert("Invalid currency choice");
             }
@@ -138,6 +140,7 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         uint256 currencyChoice,
         uint256 voucherId
     ) external nonReentrant whenNotPaused onlyWhitelisted {
+        lastCaller =msg.sender;
         require(
             balanceOf(beneficiary, voucherId) > 0,
             "Beneficiary does not own this NFT"
