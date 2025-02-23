@@ -14,7 +14,6 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
-   
     IERC20 public UAUSD;
     IERC20 public PayPalUSD;
     IERC20 public USDT;
@@ -144,15 +143,17 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         require(locked > 0, "No locked amount available");
 
         _burn(beneficiary, voucherId, 1);
-        //Transfer the locked ammount in the selected currency
+        //Transfer the locked ammount in the selected currency, 
+        //fixes transfer from the beneficiary since the Contract doesnt hold the funds
+        
         if (currencyChoice == 0) {
-            UAUSD.safeTransfer(serviceProvider, locked);
+            UAUSD.safeTransferFrom(beneficiary, serviceProvider, locked);
         } else if (currencyChoice == 1) {
-            PayPalUSD.safeTransfer(serviceProvider, locked);
+            PayPalUSD.safeTransferFrom(beneficiary, serviceProvider, locked);
         } else if (currencyChoice == 2) {
-            USDT.safeTransfer(serviceProvider, locked);
+            USDT.safeTransferFrom(beneficiary, serviceProvider, locked);
         } else if (currencyChoice == 3) {
-            USDC.safeTransfer(serviceProvider, locked);
+            USDC.safeTransferFrom(beneficiary, serviceProvider, locked);
         } else {
             revert("Invalid currency choice");
         }

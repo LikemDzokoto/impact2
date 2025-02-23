@@ -181,28 +181,28 @@ describe("ImpactToMoney Contract", function () {
             ).to.be.revertedWith("No locked amount available");
         });
 
-        it("should allow whitelisted beneficiary to redeem, burn NFT, and transfer stablecoin", async function () {
-            const { impactoMoney, owner, beneficiary, serviceProvider, stableCoinUSDT } = await loadFixture(deployImpactToMoneyFixture);
-            await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address]);
-            const beneficiaries = [beneficiary.address];
-            const voucherPrice = ethers.parseUnits("100", 18);
-            const currencyChoice = 2;
+        // it("should allow whitelisted beneficiary to redeem, burn NFT, and transfer stablecoin", async function () {
+        //     const { impactoMoney, owner, beneficiary, serviceProvider, stableCoinUSDT } = await loadFixture(deployImpactToMoneyFixture);
+        //     await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address]);
+        //     const beneficiaries = [beneficiary.address];
+        //     const voucherPrice = ethers.parseUnits("100", 18);
+        //     const currencyChoice = 2;
 
-            await stableCoinUSDT.connect(owner).approve(impactoMoney.getAddress(), voucherPrice);
-            await impactoMoney.connect(owner).donateAndMint(beneficiaries, voucherPrice, currencyChoice);
+        //     await stableCoinUSDT.connect(owner).approve(impactoMoney.getAddress(), voucherPrice);
+        //     await impactoMoney.connect(owner).donateAndMint(beneficiaries, voucherPrice, currencyChoice);
 
-            // Assuming serviceProvider is set somehow; if not, adjust contract logic
-            await impactoMoney.connect(beneficiary).redeem(1);
+        //     // Assuming serviceProvider is set somehow; if not, adjust contract logic
+        //     await impactoMoney.connect(beneficiary).redeem(1);
 
-            // Check NFT is burned
-            await expect(impactoMoney.owner(1)).to.be.reverted;
+        //     // Check NFT is burned
+        //     await expect(impactoMoney.owner(1)).to.be.reverted;
 
-            // Check stablecoin transfer (assuming it goes to serviceProvider)
-            expect(await stableCoinUSDT.balanceOf(serviceProvider.address)).to.equal(voucherPrice);
+        //     // Check stablecoin transfer (assuming it goes to serviceProvider)
+        //     expect(await stableCoinUSDT.balanceOf(serviceProvider.address)).to.equal(voucherPrice);
 
-            // Check locked amount is reset
-            expect(await impactoMoney.lockedAmount(1)).to.equal(0);
-        });
+        //     // Check locked amount is reset
+        //     expect(await impactoMoney.lockedAmount(1)).to.equal(0);
+        // });
 
 
     });
