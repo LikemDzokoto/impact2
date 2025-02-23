@@ -72,7 +72,8 @@ describe("ImpactoMoney Redeem Flow Integration Test", function () {
         expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(donationAmount);
 
         // Beneficiary approves ImpactoMoney to spend USDT
-        await stableCoinUSDT.connect(beneficiary).approve(impactoMoney.getAddress(), donationAmount);
+        const beneficiarySigner = await ethers.provider.getSigner(beneficiary.address);
+        await stableCoinUSDT.connect(beneficiarySigner).approve(impactoMoney.getAddress(), donationAmount);
         console.log("Beneficiary allowance to contract:", ethers.formatUnits(await stableCoinUSDT.allowance(beneficiary.address, impactoMoney.getAddress()), 18));
         expect(await stableCoinUSDT.allowance(beneficiary.address, impactoMoney.getAddress())).to.equal(donationAmount);
 
@@ -103,7 +104,7 @@ describe("ImpactoMoney Redeem Flow Integration Test", function () {
             if (error instanceof Error) {
                 console.log("Redeem failed with error:", error.message);
                 console.log("Last caller in contract (after fail):", await impactoMoney.lastCaller());
-                throw error; // Re-throw to fail the test
+                throw error;
             }
         }
         

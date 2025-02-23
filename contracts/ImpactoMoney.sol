@@ -9,15 +9,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
-
 /// @title ImpactoMoney: A contract that is used for minting and redeeming vouchers
-
-
 
 contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
-    // three token addresses uausd usdc paypal usd
+   
     IERC20 public UAUSD;
     IERC20 public PayPalUSD;
     IERC20 public USDT;
@@ -45,7 +42,6 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         address paypalUsdtAddress,
         address usdtAddress,
         address usdcAddress,
-       
         string memory initialMetadataURI,
         address initialOwner
     ) ERC1155(initialMetadataURI) Ownable(initialOwner) {
@@ -67,10 +63,9 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         _;
     }
 
-    function updateMetadataURI(string memory newMetadataURI)
-        external
-        onlyOwner
-    {
+    function updateMetadataURI(
+        string memory newMetadataURI
+    ) external onlyOwner {
         tokenURIs[tokenId] = newMetadataURI; // Set URI for new tokenId
         _setURI(newMetadataURI);
         emit MetadataURIUpdated(newMetadataURI);
@@ -80,59 +75,58 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         return tokenURIs[_id]; // Retrieve the specific URI for each tokenId
     }
 
-        function donateAndMint (
-            address[] memory beneficiaries,
-            uint256 voucherPrice,
-            uint256 currencyChoice
-        ) external onlyAdmin whenNotPaused nonReentrant {
-            uint256 count = beneficiaries.length;
-            require(count > 0, "Beneficiaries list is empty");
-            require(voucherPrice > 0, "Donation amount must be greater than zero");
+    function donateAndMint(
+        address[] memory beneficiaries,
+        uint256 voucherPrice,
+        uint256 currencyChoice
+    ) external onlyAdmin whenNotPaused nonReentrant {
+        uint256 count = beneficiaries.length;
+        require(count > 0, "Beneficiaries list is empty");
+        require(voucherPrice > 0, "Donation amount must be greater than zero");
 
-            IERC20 selectedCurrency;
-            if (currencyChoice == 0) {
+        IERC20 selectedCurrency;
+        if (currencyChoice == 0) {
             selectedCurrency = UAUSD;
-            } else if (currencyChoice == 1) {
+        } else if (currencyChoice == 1) {
             selectedCurrency = PayPalUSD;
-            } else if (currencyChoice == 2) {
-            selectedCurrency = USDT; 
-            } else if (currencyChoice == 3) {
-            selectedCurrency = USDC;  
-            } else {
-                revert("Invalid currency choice");
-            }
-
-
-            require(
-                selectedCurrency.balanceOf(msg.sender) >= voucherPrice * count,
-                "Insufficient currency balance"
-            );
-            require(
-                selectedCurrency.allowance(msg.sender, address(this)) >=
-                    voucherPrice * count,
-                "Insufficient allowance"
-            );
-
-            for (uint256 i = 0; i < count; i++) {
-                address beneficiary = beneficiaries[i];
-                require(
-                    whitelistedBeneficiaries[beneficiary],
-                    "Beneficiary not whitelisted"
-                );
-
-                beneficiaryTokenId[beneficiary] = tokenId;
-                _mint(beneficiary, tokenId, 1, "");
-                emit NFTMinted(beneficiary, tokenId);
-                tokenId++;
-
-                selectedCurrency.safeTransferFrom(
-                    msg.sender,
-                    beneficiary,
-                    voucherPrice
-                );
-                lockedAmount[beneficiary] = voucherPrice;
-            }
+        } else if (currencyChoice == 2) {
+            selectedCurrency = USDT;
+        } else if (currencyChoice == 3) {
+            selectedCurrency = USDC;
+        } else {
+            revert("Invalid currency choice");
         }
+
+        require(
+            selectedCurrency.balanceOf(msg.sender) >= voucherPrice * count,
+            "Insufficient currency balance"
+        );
+        require(
+            selectedCurrency.allowance(msg.sender, address(this)) >=
+                voucherPrice * count,
+            "Insufficient allowance"
+        );
+
+        for (uint256 i = 0; i < count; i++) {
+            address beneficiary = beneficiaries[i];
+            require(
+                whitelistedBeneficiaries[beneficiary],
+                "Beneficiary not whitelisted"
+            );
+
+            beneficiaryTokenId[beneficiary] = tokenId;
+            _mint(beneficiary, tokenId, 1, "");
+            emit NFTMinted(beneficiary, tokenId);
+            tokenId++;
+
+            selectedCurrency.safeTransferFrom(
+                msg.sender,
+                beneficiary,
+                voucherPrice
+            );
+            lockedAmount[beneficiary] = voucherPrice;
+        }
+    }
 
     function redeem(
         address beneficiary,
@@ -140,7 +134,7 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         uint256 currencyChoice,
         uint256 voucherId
     ) external nonReentrant whenNotPaused onlyWhitelisted {
-        lastCaller =msg.sender;
+        lastCaller = msg.sender;
         require(
             balanceOf(beneficiary, voucherId) > 0,
             "Beneficiary does not own this NFT"
@@ -152,13 +146,13 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         _burn(beneficiary, voucherId, 1);
         //Transfer the locked ammount in the selected currency
         if (currencyChoice == 0) {
-           UAUSD.safeTransfer(serviceProvider, locked);
+            UAUSD.safeTransfer(serviceProvider, locked);
         } else if (currencyChoice == 1) {
-           PayPalUSD.safeTransfer(serviceProvider, locked);
+            PayPalUSD.safeTransfer(serviceProvider, locked);
         } else if (currencyChoice == 2) {
-           USDT.safeTransfer(serviceProvider, locked);
+            USDT.safeTransfer(serviceProvider, locked);
         } else if (currencyChoice == 3) {
-           USDC.safeTransfer(serviceProvider, locked);
+            USDC.safeTransfer(serviceProvider, locked);
         } else {
             revert("Invalid currency choice");
         }
@@ -167,19 +161,17 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         lockedAmount[beneficiary] = 0;
     }
 
-    function whitelistBeneficiaries(address[] memory beneficiaries)
-        external
-        onlyOwner
-    {
+    function whitelistBeneficiaries(
+        address[] memory beneficiaries
+    ) external onlyOwner {
         for (uint256 i = 0; i < beneficiaries.length; i++) {
             whitelistedBeneficiaries[beneficiaries[i]] = true;
         }
     }
 
-    function removeWhitelistedBeneficiaries(address[] memory beneficiaries)
-        external
-        onlyOwner
-    {
+    function removeWhitelistedBeneficiaries(
+        address[] memory beneficiaries
+    ) external onlyOwner {
         for (uint256 i = 0; i < beneficiaries.length; i++) {
             whitelistedBeneficiaries[beneficiaries[i]] = false;
         }
