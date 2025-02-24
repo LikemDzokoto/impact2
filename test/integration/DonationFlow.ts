@@ -68,7 +68,7 @@ describe("ImpactoMoney Donation Flow Integration Test", function () {
 
         // Verify escrow: funds stay in contract, not beneficiary
         expect(await stableCoinUSDT.balanceOf(owner.address)).to.equal(initialOwnerBalance - donationAmount);
-        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance); // No change
+        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance); 
         expect(await stableCoinUSDT.balanceOf(impactoMoney.getAddress())).to.equal(initialContractBalance + donationAmount);
 
         // Verify voucher-specific locked amount
