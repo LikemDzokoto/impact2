@@ -14,17 +14,18 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
+    //maximum number of beneficiary per bulk mint to avoid gas issues
+    uint256 public constant MAX_BENEFICIARIES = 50;
+
     IERC20 public UAUSD;
     IERC20 public PayPalUSD;
     IERC20 public USDT;
     IERC20 public USDC;
 
-    //temp address to debug
-    address public lastCaller;
-
     uint256 public tokenId = 1;
     mapping(uint256 => string) private tokenURIs; // New mapping for token-specific URIs
-    mapping(address => uint256) public lockedAmount;
+    mapping(uint256 => uint256) public lockedAmount;
+    mapping(uint256 => uint256) public voucherCurrency; // Currency choice per voucher
     mapping(address => uint256) public beneficiaryTokenId;
     mapping(address => bool) public whitelistedBeneficiaries;
 
@@ -80,7 +81,12 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         uint256 currencyChoice
     ) external onlyAdmin whenNotPaused nonReentrant {
         uint256 count = beneficiaries.length;
+
         require(count > 0, "Beneficiaries list is empty");
+        require(
+            count <= MAX_BENEFICIARIES,
+            "Exceeds Maximum Beneficiaries(50)"
+        );
         require(voucherPrice > 0, "Donation amount must be greater than zero");
 
         IERC20 selectedCurrency;
@@ -108,22 +114,33 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
 
         for (uint256 i = 0; i < count; i++) {
             address beneficiary = beneficiaries[i];
+            require(beneficiary != address(0), "Zero address not allowed");
             require(
                 whitelistedBeneficiaries[beneficiary],
                 "Beneficiary not whitelisted"
             );
 
+            for (uint256 j = 0; j < i; j++) {
+                require(
+                    beneficiaries[j] != beneficiary,
+                    "Duplicate address not allowed"
+                );
+            }
+
             beneficiaryTokenId[beneficiary] = tokenId;
+            tokenURIs[tokenId] = uri(0);
             _mint(beneficiary, tokenId, 1, "");
             emit NFTMinted(beneficiary, tokenId);
-            tokenId++;
 
             selectedCurrency.safeTransferFrom(
                 msg.sender,
-                beneficiary,
+                address(this),
                 voucherPrice
             );
-            lockedAmount[beneficiary] = voucherPrice;
+            lockedAmount[tokenId] = voucherPrice;
+            voucherCurrency[tokenId] = currencyChoice;
+
+            tokenId++; 
         }
     }
 
@@ -133,39 +150,47 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         uint256 currencyChoice,
         uint256 voucherId
     ) external nonReentrant whenNotPaused onlyWhitelisted {
-        lastCaller = msg.sender;
+        require(beneficiary != address(0), "Invalid beneficiary address");
         require(
-            balanceOf(beneficiary, voucherId) > 0,
-            "Beneficiary does not own this NFT"
+            serviceProvider != address(0),
+            "Invalid service provider address"
         );
+       require(msg.sender == beneficiary, "Only beneficiary can redeem their voucher");
+       require(balanceOf(beneficiary, voucherId) > 0, "Beneficiary does not own this NFT");
 
-        uint256 locked = lockedAmount[beneficiary];
+        uint256 locked = lockedAmount[voucherId];
         require(locked > 0, "No locked amount available");
 
+        // Validate currency matches voucher's issuance
+        require(
+            voucherCurrency[voucherId] == currencyChoice,
+            "Currency choice mismatch"
+        );
+
         _burn(beneficiary, voucherId, 1);
-        //Transfer the locked ammount in the selected currency, 
-        //fixes transfer from the beneficiary since the Contract doesnt hold the funds
-        
+
+        // Transfer from contract (escrow) to service provider
         if (currencyChoice == 0) {
-            UAUSD.safeTransferFrom(beneficiary, serviceProvider, locked);
+            UAUSD.safeTransfer(serviceProvider, locked);
         } else if (currencyChoice == 1) {
-            PayPalUSD.safeTransferFrom(beneficiary, serviceProvider, locked);
+            PayPalUSD.safeTransfer(serviceProvider, locked);
         } else if (currencyChoice == 2) {
-            USDT.safeTransferFrom(beneficiary, serviceProvider, locked);
+            USDT.safeTransfer(serviceProvider, locked);
         } else if (currencyChoice == 3) {
-            USDC.safeTransferFrom(beneficiary, serviceProvider, locked);
+            USDC.safeTransfer(serviceProvider, locked);
         } else {
             revert("Invalid currency choice");
         }
 
         emit Redeemed(beneficiary, serviceProvider, locked);
-        lockedAmount[beneficiary] = 0;
+        lockedAmount[voucherId] = 0;
     }
 
     function whitelistBeneficiaries(
         address[] memory beneficiaries
     ) external onlyOwner {
         for (uint256 i = 0; i < beneficiaries.length; i++) {
+            require(beneficiaries[i] != address(0), "Zero address not allowed");
             whitelistedBeneficiaries[beneficiaries[i]] = true;
         }
     }
@@ -174,6 +199,7 @@ contract ImpactoMoney is ERC1155, Ownable, ReentrancyGuard, Pausable {
         address[] memory beneficiaries
     ) external onlyOwner {
         for (uint256 i = 0; i < beneficiaries.length; i++) {
+            require(beneficiaries[i] != address(0), "Zero address not allowed");
             whitelistedBeneficiaries[beneficiaries[i]] = false;
         }
     }

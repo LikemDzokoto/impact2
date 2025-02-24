@@ -7,7 +7,6 @@ describe("ImpactoMoney Donation Flow Integration Test", function () {
     async function deployImpactToMoneyFixture() {
         const [owner, beneficiary] = await ethers.getSigners();
 
-       
         const StableCoinUSDT = await ethers.getContractFactory("StableCoinUSDT");
         const stableCoinUSDT = await StableCoinUSDT.deploy(owner.address);
 
@@ -44,41 +43,41 @@ describe("ImpactoMoney Donation Flow Integration Test", function () {
     it("should successfully complete the donation flow", async function () {
         const { impactoMoney, owner, beneficiary, stableCoinUSDT } = await loadFixture(deployImpactToMoneyFixture);
 
-        // Whitelist the beneficiary
+       
         await impactoMoney.connect(owner).whitelistBeneficiaries([beneficiary.address]);
         expect(await impactoMoney.whitelistedBeneficiaries(beneficiary.address)).to.be.true;
 
-        // Approve the ImpactoMoney  to spend USDT
-        const donationAmount = ethers.parseUnits("100", 18); // 100 USDT
+      
+        const donationAmount = ethers.parseUnits("100", 18);
         await stableCoinUSDT.connect(owner).approve(impactoMoney.getAddress(), donationAmount);
         expect(await stableCoinUSDT.allowance(owner.address, impactoMoney.getAddress())).to.equal(donationAmount);
 
-        // Record initial balances
+       
         const initialOwnerBalance = await stableCoinUSDT.balanceOf(owner.address);
         const initialBeneficiaryBalance = await stableCoinUSDT.balanceOf(beneficiary.address);
+        const initialContractBalance = await stableCoinUSDT.balanceOf(impactoMoney.getAddress());
 
-       
         const beneficiaries = [beneficiary.address];
         const currencyChoice = 2; // USDT
         const tx = await impactoMoney.connect(owner).donateAndMint(beneficiaries, donationAmount, currencyChoice);
         await tx.wait();
 
-        
-        // NFT minted to beneficiary
+        // Verify NFT minting
         expect(await impactoMoney.balanceOf(beneficiary.address, 1)).to.equal(1);
         expect(await impactoMoney.beneficiaryTokenId(beneficiary.address)).to.equal(1);
 
-        // USDT transferred from owner to beneficiary
+        // Verify escrow: funds stay in contract, not beneficiary
         expect(await stableCoinUSDT.balanceOf(owner.address)).to.equal(initialOwnerBalance - donationAmount);
-        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance + donationAmount);
+        expect(await stableCoinUSDT.balanceOf(beneficiary.address)).to.equal(initialBeneficiaryBalance); // No change
+        expect(await stableCoinUSDT.balanceOf(impactoMoney.getAddress())).to.equal(initialContractBalance + donationAmount);
 
-        // Locked amount set
-        expect(await impactoMoney.lockedAmount(beneficiary.address)).to.equal(donationAmount);
+        // Verify voucher-specific locked amount
+        expect(await impactoMoney.lockedAmount(1)).to.equal(donationAmount);
 
-        // Token ID incremented
+      
         expect(await impactoMoney.tokenId()).to.equal(2);
 
-        
+      
         await expect(tx).to.emit(impactoMoney, "NFTMinted").withArgs(beneficiary.address, 1);
     });
 });
