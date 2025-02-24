@@ -5,6 +5,12 @@ import "hardhat-deploy";
 
 import * as dotenv from "dotenv";
 
+dotenv.config();
+
+if (!process.env.PRIVATE_KEY) {
+  throw new Error("PRIVATE_KEY not set in .env—required for Sepolia deployment");
+}
+
 
 const config: HardhatUserConfig = {
   solidity: "0.8.20",
@@ -15,7 +21,7 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize:true,
     },
 
-   Sepolia: {
+   sepolia: {
       url: "https://sepolia.gateway.tenderly.co",
       chainId:11155111,
       accounts: [process.env.PRIVATE_KEY as string],
@@ -25,7 +31,7 @@ const config: HardhatUserConfig = {
 
 
   namedAccounts: {
-    deployer: {
+    deployer: {   
       default: 0,
     },
   },
@@ -34,7 +40,7 @@ const config: HardhatUserConfig = {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
 
-  
+
   paths: {
     sources: "./contracts",
     tests: "./test",
