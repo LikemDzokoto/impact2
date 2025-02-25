@@ -51,7 +51,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
     console.log("StableCoinUSDC deployed to:", stableCoinUSDC.address, "Newly deployed:", stableCoinUSDC.newlyDeployed);
 
     // ImpactoMoney with constructor arguments
-    const initialMetadataURI = "ipfs://";  // i have to change the metadataURI when provided
+    const initialMetadataURI = "https://salmon-genuine-swordtail-78.mypinata.cloud/ipfs/bafkreifoi7zezae53pbxbzyifjrscdrdczphxbxmhdztjr5e5jszasiimi"; 
     const impactoMoney = await deploy("ImpactoMoney", {
         from: deployer,
         args: [
@@ -62,7 +62,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
             initialMetadataURI,
             deployer,
         ],
-        log: true,
+        log: true,  
         autoMine: true,
         deterministicDeployment: true,
     });
