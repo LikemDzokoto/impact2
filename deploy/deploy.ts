@@ -19,7 +19,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
         args: [deployer], // deployer is the  initialOwner
         log: true,
         autoMine: true,
-        deterministicDeployment: true,
+      
     });
     console.log("StableCoinUAUSD deployed to:", stableCoinUAUSD.address, "Newly deployed:", stableCoinUAUSD.newlyDeployed);
 
@@ -28,7 +28,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
         args: [deployer],
         log: true,
         autoMine: true,
-        deterministicDeployment: true,
+     
     });
     console.log("StableCoinPaypalUSDT deployed to:", stableCoinPaypalUSDT.address, "Newly deployed:", stableCoinPaypalUSDT.newlyDeployed);
 
@@ -37,7 +37,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
         args: [deployer],
         log: true,
         autoMine: true,
-        deterministicDeployment: true,
+      
     });
     console.log("StableCoinUSDT deployed to:", stableCoinUSDT.address, "Newly deployed:", stableCoinUSDT.newlyDeployed);
 
@@ -46,7 +46,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
         args: [deployer],
         log: true,
         autoMine: true,
-        deterministicDeployment: true,
+      
     });
     console.log("StableCoinUSDC deployed to:", stableCoinUSDC.address, "Newly deployed:", stableCoinUSDC.newlyDeployed);
 
@@ -64,7 +64,7 @@ const deployFunction: DeployFunction = async function (hre: HardhatRuntimeEnviro
         ],
         log: true,  
         autoMine: true,
-        deterministicDeployment: true,
+       
     });
 
     console.log("ImpactoMoney deployed to:", impactoMoney.address, "Newly deployed:", impactoMoney.newlyDeployed);
